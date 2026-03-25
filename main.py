@@ -11,40 +11,31 @@ from langchain_core.prompts import PromptTemplate
 from langchain_community.vectorstores import FAISS
 from langchain_core.runnables import RunnableParallel, RunnableLambda, RunnablePassthrough
 
-
-# LOAD ENV
-
-load_dotenv()
-
-
-# UI ALWAYS SHOW
+# -----------------------------
+# CONFIG + DEBUG
+# -----------------------------
+st.set_page_config(page_title="YouTube Chatbot")
 
 st.title("🎥 YouTube Transcript Chatbot")
 st.write("🚀 App Loaded Successfully")
+st.write("PORT:", os.environ.get("PORT"))  # Debug
 
+# -----------------------------
+# LOAD ENV
+# -----------------------------
+load_dotenv()
 
+# -----------------------------
 # MODEL
-
+# -----------------------------
 model = ChatGoogleGenerativeAI(
     model="gemini-2.5-flash",
     google_api_key=os.getenv("GOOGLE_API_KEY")
 )
 
-
-# CACHE EMBEDDINGS (IMPORTANT FIX)
-
-@st.cache_resource
-def load_embeddings():
-    from langchain_huggingface import HuggingFaceEmbeddings
-    return HuggingFaceEmbeddings(
-        model_name="sentence-transformers/all-MiniLM-L6-v2"
-    )
-
-embeddings = load_embeddings()
-
-
+# -----------------------------
 # HELPERS
-
+# -----------------------------
 def format_docs(docs):
     return "\n\n".join([doc.page_content for doc in docs])
 
@@ -58,27 +49,36 @@ def get_video_id(url):
     
     return None 
 
-
+# -----------------------------
 # INPUT
-
+# -----------------------------
 url = st.text_input("Enter YouTube Video URL")
 
-
+# -----------------------------
 # PROCESS VIDEO
-
+# -----------------------------
 if st.button("Get Transcript"):
 
     if not url:
         st.warning("Please enter a URL")
+
     else:
         video_id = get_video_id(url)
 
         if video_id:
             try:
-                st.info("Fetching transcript...")
+                st.info("📥 Fetching transcript...")
 
-                transcript = YouTubeTranscriptApi.get_transcript(video_id)
-                full_text = " ".join([entry['text'] for entry in transcript])
+                # ✅ NEW API METHOD (IMPORTANT FIX)
+                api = YouTubeTranscriptApi()
+                transcript_list = api.list(video_id)
+
+                transcript = transcript_list.find_transcript(
+                    [t.language_code for t in transcript_list]
+                )
+
+                data = transcript.fetch()
+                full_text = " ".join([entry.text for entry in data])
 
                 splitter = RecursiveCharacterTextSplitter(
                     chunk_size=500,
@@ -86,7 +86,16 @@ if st.button("Get Transcript"):
                 )
                 chunks = splitter.split_text(full_text)
 
-                st.info("Creating embeddings...")
+                st.info("🧠 Loading embeddings...")
+
+                # ✅ LOAD EMBEDDINGS ONLY WHEN BUTTON CLICKED
+                from langchain_huggingface import HuggingFaceEmbeddings
+
+                embeddings = HuggingFaceEmbeddings(
+                    model_name="sentence-transformers/all-MiniLM-L6-v2"
+                )
+
+                st.info("📦 Creating vector store...")
 
                 vectorstore = FAISS.from_texts(chunks, embeddings)
 
@@ -94,16 +103,17 @@ if st.button("Get Transcript"):
                 st.session_state.vectorstore = vectorstore
                 st.session_state.ready = True
 
-                st.success("Transcript processed successfully!")
+                st.success("✅ Transcript processed successfully!")
 
             except Exception as e:
-                st.error(f" Error: {str(e)}")
+                st.error(f"❌ Error: {str(e)}")
+
         else:
             st.error("Invalid YouTube URL")
 
-
+# -----------------------------
 # QUERY SECTION
-
+# -----------------------------
 if st.session_state.get("ready"):
 
     query = st.text_input("Ask a question about the video")
@@ -131,8 +141,8 @@ Question:
 
             result = main_chain.invoke(query)
 
-            st.write("### Answer:")
+            st.write("### 💬 Answer:")
             st.write(result)
 
         except Exception as e:
-            st.error(f" Error: {str(e)}")
+            st.error(f"❌ Error: {str(e)}")
