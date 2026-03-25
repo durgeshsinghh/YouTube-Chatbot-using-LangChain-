@@ -12,13 +12,13 @@ from langchain_community.vectorstores import FAISS
 from langchain_core.runnables import RunnableParallel, RunnableLambda, RunnablePassthrough
 
 # -----------------------------
-# CONFIG + DEBUG
+# CONFIG + UI (ALWAYS LOAD FAST)
 # -----------------------------
 st.set_page_config(page_title="YouTube Chatbot")
 
 st.title("🎥 YouTube Transcript Chatbot")
-st.write("🚀 App Loaded Successfully")
-st.write("PORT:", os.environ.get("PORT"))  # Debug
+st.write("🚀 App Running Successfully")
+st.write("PORT:", os.environ.get("PORT"))
 
 # -----------------------------
 # LOAD ENV
@@ -55,7 +55,7 @@ def get_video_id(url):
 url = st.text_input("Enter YouTube Video URL")
 
 # -----------------------------
-# PROCESS VIDEO
+# PROCESS VIDEO (LAZY LOADING HERE)
 # -----------------------------
 if st.button("Get Transcript"):
 
@@ -69,7 +69,7 @@ if st.button("Get Transcript"):
             try:
                 st.info("📥 Fetching transcript...")
 
-                # ✅ NEW API METHOD (IMPORTANT FIX)
+                # ✅ NEW API
                 api = YouTubeTranscriptApi()
                 transcript_list = api.list(video_id)
 
@@ -80,15 +80,16 @@ if st.button("Get Transcript"):
                 data = transcript.fetch()
                 full_text = " ".join([entry.text for entry in data])
 
+                # Split
                 splitter = RecursiveCharacterTextSplitter(
                     chunk_size=500,
                     chunk_overlap=50
                 )
                 chunks = splitter.split_text(full_text)
 
-                st.info("🧠 Loading embeddings...")
+                st.info("🧠 Loading embeddings (first time only)...")
 
-                # ✅ LOAD EMBEDDINGS ONLY WHEN BUTTON CLICKED
+                # 🔥 LAZY LOAD EMBEDDINGS HERE
                 from langchain_huggingface import HuggingFaceEmbeddings
 
                 embeddings = HuggingFaceEmbeddings(
@@ -99,7 +100,7 @@ if st.button("Get Transcript"):
 
                 vectorstore = FAISS.from_texts(chunks, embeddings)
 
-                # STORE STATE
+                # Store
                 st.session_state.vectorstore = vectorstore
                 st.session_state.ready = True
 
