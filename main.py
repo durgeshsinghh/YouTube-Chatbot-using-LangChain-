@@ -1,20 +1,29 @@
-from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled
+import streamlit as st
+import os
+from dotenv import load_dotenv
+from urllib.parse import urlparse, parse_qs
+
+from youtube_transcript_api import YouTubeTranscriptApi
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.output_parsers import StrOutputParser
 from langchain_google_genai import ChatGoogleGenerativeAI
-import os
 from langchain_core.prompts import PromptTemplate
-from dotenv import load_dotenv
-load_dotenv()
 from langchain_community.vectorstores import FAISS
 from langchain_core.runnables import RunnableParallel, RunnableLambda, RunnablePassthrough
 
-# HuggingFace
-from langchain_huggingface import HuggingFaceEmbeddings
 
-import streamlit as st
-from urllib.parse import urlparse, parse_qs
+# LOAD ENV
 
+load_dotenv()
+
+
+# UI ALWAYS SHOW
+
+st.title("🎥 YouTube Transcript Chatbot")
+st.write("🚀 App Loaded Successfully")
+
+
+# MODEL
 
 model = ChatGoogleGenerativeAI(
     model="gemini-2.5-flash",
@@ -22,9 +31,19 @@ model = ChatGoogleGenerativeAI(
 )
 
 
-st.title("Youtube Transcript Chatbot")
-st.write("App loaded successfully 🚀")   
+# CACHE EMBEDDINGS (IMPORTANT FIX)
 
+@st.cache_resource
+def load_embeddings():
+    from langchain_huggingface import HuggingFaceEmbeddings
+    return HuggingFaceEmbeddings(
+        model_name="sentence-transformers/all-MiniLM-L6-v2"
+    )
+
+embeddings = load_embeddings()
+
+
+# HELPERS
 
 def format_docs(docs):
     return "\n\n".join([doc.page_content for doc in docs])
@@ -40,6 +59,8 @@ def get_video_id(url):
     return None 
 
 
+# INPUT
+
 url = st.text_input("Enter YouTube Video URL")
 
 
@@ -54,15 +75,10 @@ if st.button("Get Transcript"):
 
         if video_id:
             try:
-                st.info("Fetching transcript...")   # show loading
+                st.info("Fetching transcript...")
 
-                api = YouTubeTranscriptApi()
-                transcript_list = api.list(video_id)
-                transcript = transcript_list.find_transcript(
-                      [t.language_code for t in transcript_list]
-                      )
-                data = transcript.fetch()
-                full_text = " ".join([entry.text for entry in data])
+                transcript = YouTubeTranscriptApi.get_transcript(video_id)
+                full_text = " ".join([entry['text'] for entry in transcript])
 
                 splitter = RecursiveCharacterTextSplitter(
                     chunk_size=500,
@@ -70,9 +86,7 @@ if st.button("Get Transcript"):
                 )
                 chunks = splitter.split_text(full_text)
 
-                embeddings = HuggingFaceEmbeddings(
-                    model_name="sentence-transformers/all-MiniLM-L6-v2"
-                )
+                st.info("Creating embeddings...")
 
                 vectorstore = FAISS.from_texts(chunks, embeddings)
 
@@ -83,12 +97,12 @@ if st.button("Get Transcript"):
                 st.success("Transcript processed successfully!")
 
             except Exception as e:
-                st.error(f"Error: {str(e)}")
+                st.error(f" Error: {str(e)}")
         else:
-            st.error("Invalid URL")
+            st.error("Invalid YouTube URL")
 
 
-# QUERY SECTION (SAME STRUCTURE)
+# QUERY SECTION
 
 if st.session_state.get("ready"):
 
@@ -121,4 +135,4 @@ Question:
             st.write(result)
 
         except Exception as e:
-            st.error(f"Error: {str(e)}")
+            st.error(f" Error: {str(e)}")
