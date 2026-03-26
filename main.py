@@ -71,6 +71,7 @@ if st.button("Get Transcript"):
         if video_id:
             try:
                 st.info("📥 Fetching transcript...")
+                from youtube_transcript_api import YouTubeTranscriptApi
                 api = YouTubeTranscriptApi()
                 transcript_list = api.list(video_id)
                 transcript = transcript_list.find_transcript(
