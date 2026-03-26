@@ -2,6 +2,7 @@ import streamlit as st
 import os
 from dotenv import load_dotenv
 from urllib.parse import urlparse, parse_qs
+from youtube_transcript_api import YouTubeTranscriptApi
 
 from youtube_transcript_api import YouTubeTranscriptApi
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -70,9 +71,13 @@ if st.button("Get Transcript"):
         if video_id:
             try:
                 st.info("📥 Fetching transcript...")
-
-                transcript = YouTubeTranscriptApi.get_transcript(video_id)
-                full_text = " ".join([entry['text'] for entry in transcript])
+                api = YouTubeTranscriptApi()
+                transcript_list = api.list(video_id)
+                transcript = transcript_list.find_transcript(
+                    [t.language_code for t in transcript_list]
+                )
+                data = transcript.fetch()
+                full_text = " ".join([entry.text for entry in data])
 
             except Exception as e:
                 st.error(f"❌ Transcript error: {str(e)}")
