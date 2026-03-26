@@ -11,31 +11,33 @@ from langchain_core.prompts import PromptTemplate
 from langchain_community.vectorstores import FAISS
 from langchain_core.runnables import RunnableParallel, RunnableLambda, RunnablePassthrough
 
+# ✅ LIGHTWEIGHT EMBEDDINGS (IMPORTANT FIX)
+from langchain_community.embeddings import FakeEmbeddings
 
-# CONFIG + UI (ALWAYS LOAD FAST)
-
+# -----------------------------
+# CONFIG + UI
+# -----------------------------
 st.set_page_config(page_title="YouTube Chatbot")
 
-st.title(" YouTube Transcript Chatbot")
-st.write("App Running Successfully")
-st.write("PORT:", os.environ.get("PORT"))
+st.title("🎥 YouTube Transcript Chatbot")
+st.write("🚀 App Running Successfully")
 
-
+# -----------------------------
 # LOAD ENV
-
+# -----------------------------
 load_dotenv()
 
-
+# -----------------------------
 # MODEL
-
+# -----------------------------
 model = ChatGoogleGenerativeAI(
     model="gemini-2.5-flash",
     google_api_key=os.getenv("GOOGLE_API_KEY")
 )
 
-
+# -----------------------------
 # HELPERS
-
+# -----------------------------
 def format_docs(docs):
     return "\n\n".join([doc.page_content for doc in docs])
 
@@ -49,14 +51,14 @@ def get_video_id(url):
     
     return None 
 
-
+# -----------------------------
 # INPUT
-
+# -----------------------------
 url = st.text_input("Enter YouTube Video URL")
 
-
-# PROCESS VIDEO (LAZY LOADING HERE)
-
+# -----------------------------
+# PROCESS VIDEO
+# -----------------------------
 if st.button("Get Transcript"):
 
     if not url:
@@ -67,47 +69,34 @@ if st.button("Get Transcript"):
 
         if video_id:
             try:
-                st.info("Fetching transcript...")
+                st.info("📥 Fetching transcript...")
 
-                # NEW API
-                api = YouTubeTranscriptApi()
-                transcript_list = api.list(video_id)
-
-                transcript = transcript_list.find_transcript(
-                    [t.language_code for t in transcript_list]
-                )
-
-                data = transcript.fetch()
-                full_text = " ".join([entry.text for entry in data])
-
-                # Split
-                splitter = RecursiveCharacterTextSplitter(
-                    chunk_size=500,
-                    chunk_overlap=50
-                )
-                chunks = splitter.split_text(full_text)
-
-                st.info("Loading embeddings (first time only)...")
-
-                # LAZY LOAD EMBEDDINGS HERE
-                from langchain_huggingface import HuggingFaceEmbeddings
-
-                embeddings = HuggingFaceEmbeddings(
-                    model_name="sentence-transformers/all-MiniLM-L6-v2"
-                )
-
-                st.info("Creating vector store...")
-
-                vectorstore = FAISS.from_texts(chunks, embeddings)
-
-                # Store
-                st.session_state.vectorstore = vectorstore
-                st.session_state.ready = True
-
-                st.success("Transcript processed successfully!")
+                transcript = YouTubeTranscriptApi.get_transcript(video_id)
+                full_text = " ".join([entry['text'] for entry in transcript])
 
             except Exception as e:
-                st.error(f"Error: {str(e)}")
+                st.error(f"❌ Transcript error: {str(e)}")
+                st.stop()
+
+            # Split text
+            splitter = RecursiveCharacterTextSplitter(
+                chunk_size=500,
+                chunk_overlap=50
+            )
+            chunks = splitter.split_text(full_text)
+
+            st.info("🧠 Creating embeddings...")
+
+            # ✅ FAST EMBEDDINGS (NO TORCH)
+            embeddings = FakeEmbeddings(size=384)
+
+            vectorstore = FAISS.from_texts(chunks, embeddings)
+
+            # Store in session
+            st.session_state.vectorstore = vectorstore
+            st.session_state.ready = True
+
+            st.success("✅ Transcript processed successfully!")
 
         else:
             st.error("Invalid YouTube URL")
@@ -142,8 +131,8 @@ Question:
 
             result = main_chain.invoke(query)
 
-            st.write("### Answer:")
+            st.write("### 💬 Answer:")
             st.write(result)
 
         except Exception as e:
-            st.error(f"Error: {str(e)}")
+            st.error(f"❌ Error: {str(e)}")
