@@ -11,31 +11,31 @@ from langchain_core.prompts import PromptTemplate
 from langchain_community.vectorstores import FAISS
 from langchain_core.runnables import RunnableParallel, RunnableLambda, RunnablePassthrough
 
-# -----------------------------
+
 # CONFIG + UI (ALWAYS LOAD FAST)
-# -----------------------------
+
 st.set_page_config(page_title="YouTube Chatbot")
 
-st.title("🎥 YouTube Transcript Chatbot")
-st.write("🚀 App Running Successfully")
+st.title(" YouTube Transcript Chatbot")
+st.write("App Running Successfully")
 st.write("PORT:", os.environ.get("PORT"))
 
-# -----------------------------
+
 # LOAD ENV
-# -----------------------------
+
 load_dotenv()
 
-# -----------------------------
+
 # MODEL
-# -----------------------------
+
 model = ChatGoogleGenerativeAI(
     model="gemini-2.5-flash",
     google_api_key=os.getenv("GOOGLE_API_KEY")
 )
 
-# -----------------------------
+
 # HELPERS
-# -----------------------------
+
 def format_docs(docs):
     return "\n\n".join([doc.page_content for doc in docs])
 
@@ -49,14 +49,14 @@ def get_video_id(url):
     
     return None 
 
-# -----------------------------
+
 # INPUT
-# -----------------------------
+
 url = st.text_input("Enter YouTube Video URL")
 
-# -----------------------------
+
 # PROCESS VIDEO (LAZY LOADING HERE)
-# -----------------------------
+
 if st.button("Get Transcript"):
 
     if not url:
@@ -67,9 +67,9 @@ if st.button("Get Transcript"):
 
         if video_id:
             try:
-                st.info("📥 Fetching transcript...")
+                st.info("Fetching transcript...")
 
-                # ✅ NEW API
+                # NEW API
                 api = YouTubeTranscriptApi()
                 transcript_list = api.list(video_id)
 
@@ -87,16 +87,16 @@ if st.button("Get Transcript"):
                 )
                 chunks = splitter.split_text(full_text)
 
-                st.info("🧠 Loading embeddings (first time only)...")
+                st.info("Loading embeddings (first time only)...")
 
-                # 🔥 LAZY LOAD EMBEDDINGS HERE
+                # LAZY LOAD EMBEDDINGS HERE
                 from langchain_huggingface import HuggingFaceEmbeddings
 
                 embeddings = HuggingFaceEmbeddings(
                     model_name="sentence-transformers/all-MiniLM-L6-v2"
                 )
 
-                st.info("📦 Creating vector store...")
+                st.info("Creating vector store...")
 
                 vectorstore = FAISS.from_texts(chunks, embeddings)
 
@@ -104,10 +104,10 @@ if st.button("Get Transcript"):
                 st.session_state.vectorstore = vectorstore
                 st.session_state.ready = True
 
-                st.success("✅ Transcript processed successfully!")
+                st.success("Transcript processed successfully!")
 
             except Exception as e:
-                st.error(f"❌ Error: {str(e)}")
+                st.error(f"Error: {str(e)}")
 
         else:
             st.error("Invalid YouTube URL")
@@ -142,8 +142,8 @@ Question:
 
             result = main_chain.invoke(query)
 
-            st.write("### 💬 Answer:")
+            st.write("### Answer:")
             st.write(result)
 
         except Exception as e:
-            st.error(f"❌ Error: {str(e)}")
+            st.error(f"Error: {str(e)}")
