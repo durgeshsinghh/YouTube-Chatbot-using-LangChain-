@@ -12,33 +12,33 @@ from langchain_core.prompts import PromptTemplate
 from langchain_community.vectorstores import FAISS
 from langchain_core.runnables import RunnableParallel, RunnableLambda, RunnablePassthrough
 
-# ✅ LIGHTWEIGHT EMBEDDINGS (IMPORTANT FIX)
+# LIGHTWEIGHT EMBEDDINGS
 from langchain_community.embeddings import FakeEmbeddings
 
-# -----------------------------
+
 # CONFIG + UI
-# -----------------------------
+
 st.set_page_config(page_title="YouTube Chatbot")
 
 st.title("🎥 YouTube Transcript Chatbot")
 st.write("🚀 App Running Successfully")
 
-# -----------------------------
+
 # LOAD ENV
-# -----------------------------
+
 load_dotenv()
 
-# -----------------------------
+
 # MODEL
-# -----------------------------
+
 model = ChatGoogleGenerativeAI(
     model="gemini-2.5-flash",
     google_api_key=os.getenv("GOOGLE_API_KEY")
 )
 
-# -----------------------------
+
 # HELPERS
-# -----------------------------
+
 def format_docs(docs):
     return "\n\n".join([doc.page_content for doc in docs])
 
@@ -52,14 +52,14 @@ def get_video_id(url):
     
     return None 
 
-# -----------------------------
+
 # INPUT
-# -----------------------------
+
 url = st.text_input("Enter YouTube Video URL")
 
-# -----------------------------
+
 # PROCESS VIDEO
-# -----------------------------
+
 if st.button("Get Transcript"):
 
     if not url:
@@ -70,8 +70,6 @@ if st.button("Get Transcript"):
 
         if video_id:
             try:
-                st.info("📥 Fetching transcript...")
-                from youtube_transcript_api import YouTubeTranscriptApi
                 api = YouTubeTranscriptApi()
                 transcript_list = api.list(video_id)
                 transcript = transcript_list.find_transcript(
@@ -79,10 +77,12 @@ if st.button("Get Transcript"):
                 )
                 data = transcript.fetch()
                 full_text = " ".join([entry.text for entry in data])
-
-            except Exception as e:
-                st.error(f"❌ Transcript error: {str(e)}")
-                st.stop()
+            except Exception:
+                st.error("Transcript blocked by YouTube (cloud restriction)")
+                st.info("Try another video OR paste transcript manually below")
+                full_text = st.text_area("Paste transcript manually")
+                if not full_text:
+                    st.stop()
 
             # Split text
             splitter = RecursiveCharacterTextSplitter(
@@ -91,9 +91,9 @@ if st.button("Get Transcript"):
             )
             chunks = splitter.split_text(full_text)
 
-            st.info("🧠 Creating embeddings...")
+            st.info(" Creating embeddings...")
 
-            # ✅ FAST EMBEDDINGS (NO TORCH)
+            # FAST EMBEDDINGS (NO TORCH)
             embeddings = FakeEmbeddings(size=384)
 
             vectorstore = FAISS.from_texts(chunks, embeddings)
@@ -102,14 +102,14 @@ if st.button("Get Transcript"):
             st.session_state.vectorstore = vectorstore
             st.session_state.ready = True
 
-            st.success("✅ Transcript processed successfully!")
+            st.success(" Transcript processed successfully!")
 
         else:
             st.error("Invalid YouTube URL")
 
-# -----------------------------
+
 # QUERY SECTION
-# -----------------------------
+
 if st.session_state.get("ready"):
 
     query = st.text_input("Ask a question about the video")
@@ -137,7 +137,7 @@ Question:
 
             result = main_chain.invoke(query)
 
-            st.write("### 💬 Answer:")
+            st.write("### Answer:")
             st.write(result)
 
         except Exception as e:
